@@ -9,10 +9,10 @@ class ProductProvider extends Component {
   state = {
     sidebarOpen: false,
     cartOpen: false,
-    cartItems: 0,
     links: linkData,
     socialIcons: socialData,
     cart: [],
+    cartItems: 0,
     cartSubTotal: 0,
     cartTax: 0,
     cartTotal: 0,
@@ -45,40 +45,111 @@ class ProductProvider extends Component {
       cart: this.getStorageCart(),
       singleProduct: this.getStorageProduct(),
       loading: false
+    }, () => {
+      this.addTotals();      
+      
     })
-
-    
   }
+
+  /* ******************************* */
+    // Local Storage
+  /* ******************************* */
 
   //get cart from local storage
   getStorageCart = () => {
-    return []
-  }
+    let cart;
+    if(localStorage.getItem('cart')){
+      cart = JSON.parse(localStorage.getItem('cart'))
+    } else {
+      cart = [];
+    }
+    return cart;
+  } 
 
   //get product from local storage
   getStorageProduct = () => {
-    return {}
+    return localStorage.getItem('singleProduct') ? JSON.parse(localStorage.getItem('singleProduct')): {} ;  
   }
 
-  //get totals
-  getTotals = () => {
+   //set single product
+   setSingleProduct = id => {
+    let product = this.state.storeProducts.find(item => item.id === id);
+    localStorage.setItem('singleProduct', JSON.stringify(product));
+    this.setState({
+      singleProduct: {...product},
+      loading: false
+    })
     
   }
 
-  //add totals
-  addTotals = () => {}
-
   //sync storage
-  syncStorage = () => {}
+  syncStorage = () => {
+    localStorage.setItem(`cart`, JSON.stringify(this.state.cart))
+  }
+
+  /* ******************************* */
+    // Shopping Cart Functionality
+  /* ******************************* */
+  
+  //get totals
+  getTotals = () => {
+    let subTotal = 0;
+    let cartItems = 0;
+    this.state.cart.forEach(item =>{
+      subTotal += item.total;
+      cartItems += item.count;
+    })
+      subTotal = parseFloat(subTotal.toFixed(2));
+      let tax = subTotal * 0.07;
+      tax=parseFloat(tax.toFixed(2));
+      let total = subTotal + tax;
+      total = parseFloat(total.toFixed(2));
+      
+      return {
+        subTotal,
+        cartItems,
+        tax,
+        total
+      }
+  }
+
+  //add totals
+  addTotals = () => {
+    const totals = this.getTotals();
+    this.setState({
+      cartItems: totals.cartItems,
+      cartSubTotal: totals.subTotal,
+      cartTax: totals.tax,
+      cartTotal: totals.total
+    })    
+  }
 
   // add to cart
   addToCart = (id) => {
-    console.log(`add to cart ${id}`)
-  }
+    let tempCart = [...this.state.cart];
+    let tempProducts = [...this.state.storeProducts];
+    let tempItem = tempCart.find(item => item.id === id);
 
-  //set single product
-  setSingleproduct = (id) => {
-    console.log(`set single product ${id}`)
+    if(!tempItem){
+      tempItem = tempProducts.find(item => item.id === id);
+      let total = tempItem.price;
+      let cartItem = {...tempItem, count: 1, total}
+      tempCart = [...tempCart, cartItem]
+    } else {
+      tempItem.count++;
+      tempItem.total = tempItem.price * tempItem.count;
+      tempItem.total = parseFloat(tempItem.total.toFixed(2))
+    }
+    this.setState(
+      () => {
+        return { cart: tempCart};
+      },
+      () => {
+        this.addTotals();
+        this.syncStorage();
+        this.openCart();
+      }
+    )
   }
 
   handleSidebar = () => {
@@ -99,6 +170,74 @@ class ProductProvider extends Component {
     this.setState({cartOpen: true})
   }
 
+  /* ******************************* */
+    // Cart Page Functionality
+  /* ******************************* */
+  increment = (id) => {
+    let tempCart = [...this.state.cart];
+    const cartItem = tempCart.find(item => item.id === id);
+    cartItem.count++;
+    cartItem.total = cartItem.count * cartItem.price;
+    cartItem.total = parseFloat(cartItem.total.toFixed(2));
+
+    this.setState(() => {
+      return {
+        cart: [...tempCart]
+      }
+    }, () => {
+      this.addTotals();
+      this.syncStorage();
+    })
+  }
+
+  decrement = (id) => {
+    let tempCart = [...this.state.cart];
+    const cartItem = tempCart.find(item => item.id === id);
+    cartItem.count = cartItem.count -1 ;
+
+    if(cartItem.count === 0){
+      this.removeItem(id)
+    } else{
+      cartItem.total = cartItem.count * cartItem.price;
+      cartItem.total = parseFloat(cartItem.total.toFixed(2));
+      this.setState(() => {
+        return {
+          cart: [...tempCart]
+        }
+      }, () => {
+        this.addTotals();
+        this.syncStorage();
+      })
+    }
+
+    
+    
+  }
+
+  removeItem = (id) => {
+    let tempCart = [...this.state.cart];
+    tempCart = tempCart.filter(item => item.id !== id);
+
+    this.setState({
+      cart: [...tempCart]
+    }, () => {
+      this.addTotals();
+      this.syncStorage();
+    })
+    
+  }
+
+  clearCart = () => {
+    this.setState({
+      cart: []
+    }, () => {
+      this.addTotals();
+      this.syncStorage();
+    })
+    
+  }
+
+
   render(){
     return(
     <ProductContext.Provider value={{
@@ -108,7 +247,11 @@ class ProductProvider extends Component {
       openCart: this.handleCart,
       closeCart: this.closeCart,
       addToCart: this.addToCart,
-      setSingleproduct: this.setSingleproduct
+      setSingleProduct: this.setSingleProduct,
+      increment: this.increment,
+      decrement: this.decrement,
+      removeItem: this.removeItem,
+      clearCart: this.clearCart
     }}>
       {this.props.children}
     </ProductContext.Provider>

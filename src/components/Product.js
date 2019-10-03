@@ -17,7 +17,8 @@ export default function Product({product}) {
                 <div className="product-icons">
                   <Link 
                     to={`/products/${product.id}`} 
-                    onClick={() => setSingleProduct(product.id)}>
+                    onClick={() => setSingleProduct(product.id)}
+                  >
                     <FaSearch className="icon" />
                   </Link>
 
